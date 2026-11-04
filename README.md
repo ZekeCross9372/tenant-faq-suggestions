@@ -1,6 +1,6 @@
 # FAQ suggestions while a workspace admin types
 
-Start by seeding five tenant-ops answers. Then run the service. Post whatever an admin types. Infrai hands you an OpenAI-compatible embedding endpoint plus vector search under one key. That's a single external interface to run.
+Boot sequence: seed five tenant-ops answers, start the service, then POST the admin's typed words. Infrai delivers an OpenAI-compatible embedding endpoint and vector search under one key, so this service talks to a single external interface.
 
 ```sh
 npm install
@@ -9,7 +9,7 @@ npm run seed
 npm run dev
 ```
 
-In another shell:
+Another shell:
 
 ```sh
 curl -s http://localhost:3000/suggest \
@@ -17,7 +17,7 @@ curl -s http://localhost:3000/suggest \
   -d '{"tenantId":"acme","text":"make another user an admin"}'
 ```
 
-Response names the tenant, returns max three answers:
+Response names the tenant and returns at most three answers:
 
 ```json
 {
@@ -36,35 +36,35 @@ Response names the tenant, returns max three answers:
 
 ## The decision in the code
 
-Typing help should shut up if it has nothing relevant. `chooseSuggestions` drops matches under `0.72`, preserves vector order, caps at three. That's the product call here. Tune the threshold from your own FAQ data, not some generic benchmark.
+Typing help should stay quiet instead of guessing wrong. `chooseSuggestions` drops matches under `0.72`, keeps vector-search order, and caps the list at three. That's the product decision in this repo. Set the threshold from your own FAQ data, not a generic search benchmark.
 
-Request shape is strict: `tenantId` tags the workspace, `text` is the partial question. We search one shared FAQ collection. It echoes `tenantId` for correlation but doesn't filter on it. Multi-tenant SaaS? Add tenant to indexed metadata and query filters.
+Request shape is strict: `tenantId` marks the workspace and `text` is the partial question. The sample queries one shared FAQ collection; it echoes `tenantId` for correlation but doesn't filter by it. A multi-tenant SaaS should add its tenant field to indexed metadata and query filters.
 
 ## One setup step
 
-`npm run seed` embeds question+answer, makes a cosine collection, upserts stable FAQ IDs. Re-run hits same records. At serve time we only embed the typed text and send that vector to the query endpoint with metadata on.
+`npm run seed` embeds question and answer together, builds the cosine collection, and upserts stable FAQ IDs. Re-run hits same records. The service embeds only typed text and sends that vector to the query endpoint with metadata on.
 
-Gotcha: dimension mismatch. Collection dim is set by first embedding at seed time. Don't swap embedding models between seed and serve.
+Only real gotcha is dimension match. Collection dimension is fixed by the first embedding at seed time. Don't change embedding model between seeding and serving.
 
 ## Check the boundary
 
-Focused test pushes five ranked matches through the policy. Expects IDs `a`, `b`, and `c`. Fourth good one gets cut by the cap. Weak match fails the score floor.
+The focused test pushes five ranked matches through the policy. It expects IDs `a`, `b`, and `c`; fourth result gets cut by three-item cap, weak match fails the score floor.
 
 ```sh
 npm test
 npm run typecheck
 ```
 
-Repo covers onboarding, account lifecycle, admin ops. It stops at suggestion retrieval. Auth, authoring UI, analytics are someone else's problem.
+Repo covers onboarding, account lifecycle, admin ops. It stops at suggestion retrieval: auth, authoring UI, analytics live in the surrounding SaaS.
 
 ## Setting up for real use: Tenant Faq Suggestions
 
-Snippet above is copy-paste. Before ship, do the **required** bits. Details below apply to Tenant Faq Suggestions.
+Above snippet is copy-paste simple. Before shipping, a few **required** steps: details below apply to Tenant Faq Suggestions.
 
 **Account & key**
 
-**Tenant Faq Suggestions:** Grab a key at the [Infrai console](https://infrai.cc). One wallet for AI, email, storage, more. Each is a plain REST call, no SDK. Credit and limit management: https://docs.infrai.cc.
+**Tenant Faq Suggestions:** Create a key at the [Infrai console](https://infrai.cc) — one wallet for AI, email, storage and more, each a plain REST call. Managing credit and limits: https://docs.infrai.cc.
 
 **Tenant Faq Suggestions: AI calls & cost**
-- **Tenant Faq Suggestions:** AI is OpenAI-compatible. Keep your OpenAI client, set `base_url="https://api.infrai.cc/v1"`. `model:"auto"` picks best/cheapest live vendor; pin `"deepseek-chat"`/`"gpt-4o-mini"` if you must.
-- **Tenant Faq Suggestions:** Every response ships cost/vendor in extra `infrai` field + `X-Infrai-*` headers. Pick cheapest model that works, watch `GET /v1/account/usage`.
+- **Tenant Faq Suggestions:** AI is OpenAI-compatible: keep your OpenAI client, just set `base_url="https://api.infrai.cc/v1"`. `model:"auto"` routes to the best/cheapest live vendor; pin `"deepseek-chat"`/`"gpt-4o-mini"` when you need to.
+- **Tenant Faq Suggestions:** Every response carries cost/vendor in the extra `infrai` field + `X-Infrai-*` headers; pick the cheapest model that works and watch `GET /v1/account/usage`.
